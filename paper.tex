@@ -1,0 +1,658 @@
+% SIAM Article Template
+\documentclass[review,hidelinks,onefignum,onetabnum]{siamart220329}
+
+%\usepackage{.....} Insert the packages here
+\usepackage{amsmath}
+\usepackage{verbatim}
+\usepackage{subcaption}
+
+\usepackage{nomencl}
+\makenomenclature
+\usepackage{makecell}
+
+% Information that is shared between the article and the supplement
+% (title and author information, macros, packages, etc.) goes into
+% ex_shared.tex. If there is no supplement, this file can be included
+% directly.
+
+\usepackage{lipsum}
+\usepackage{amsfonts}
+\usepackage{graphicx}
+\usepackage{epstopdf}
+\usepackage{algorithmic}
+\ifpdf
+  \DeclareGraphicsExtensions{.eps,.pdf,.png,.jpg}
+\else
+  \DeclareGraphicsExtensions{.eps}
+\fi
+
+% Add a serial/Oxford comma by default.
+\newcommand{\creflastconjunction}{, and~}
+
+% Used for creating new theorem and remark environments
+\newsiamremark{remark}{Remark}
+\newsiamremark{hypothesis}{Hypothesis}
+\crefname{hypothesis}{Hypothesis}{Hypotheses}
+\newsiamthm{claim}{Claim}
+
+% Sets running headers as well as PDF title and authors
+\headers{An Article}{Zhongquan Chen, N.N., Bj\"orn Baumeier}
+
+% Title. If the supplement option is on, then "Supplementary Material"
+% is automatically inserted before the title.
+\title{A Random Walk Method for Calculating Charge Mobility\thanks{Submitted to the editors DATE.
+\funding{B.B. acknowledges support by the Innovational Research Incentives Scheme Vidi of the Netherlands Organisation for Scientific Research (NWO) with project number 723.016.002. B.B. and Z.C. also are grateful for funding from ICMS via project MPIPICMS2019001.}}}
+
+% Authors: full names plus addresses.
+\author{Zhongquan Chen\thanks{ Department of Mathematics and Computer Science \& Institute for Complex Molecular Systems, Eindhoven University of Technology, PO Box 513, 5600MB Eindhoven, the Netherlands
+  (\email{z.chen3@tue.nl}, \email{b.baumeier@tue.nl}).}
+  \and N.N.
+\and Bj\"orn Baumeier}
+
+\usepackage{amsopn}
+\DeclareMathOperator{\diag}{diag}
+
+
+% Optional PDF information
+\ifpdf
+\hypersetup{
+  pdftitle={A Random Walk Method for Calculating Time of Flight and Charge Mobility},
+  pdfauthor={Zhongquan Chen, Bj\"orn Baumeier}
+}
+\fi
+
+% The next statement enables references to information in the
+% supplement. See the xr-hyperref package for details.
+
+\externaldocument[][nocite]{ex_supplement}
+
+% FundRef data to be entered by SIAM
+%<funding-group specific-use="FundRef">
+%<award-group>
+%<funding-source>
+%<named-content content-type="funder-name"> 
+%</named-content> 
+%<named-content content-type="funder-identifier"> 
+%</named-content>
+%</funding-source>
+%<award-id> </award-id>
+%</award-group>
+%</funding-group>
+
+\begin{document}
+
+\maketitle
+
+% REQUIRED
+\begin{abstract}
+A random walk probability method is proposed to calculate the time of flight $t_{\text{TOF}}$
+and the mobility of charge carriers whose dynamics are modeled by a master equation. 
+This method relates the mobility of the charge carriers to the hitting time of a random walk process. 
+Compared with the typical kinetic Monte Carlo method which samples the random walk process via brute force computationally, this method makes use of the system's graph structure to calculate mobility as a matrix problem. 
+The advantages of this method are to avoid the compu
+
+
+This method overcomes the convergence issue of KMC and the Master equation and provides a deterministic quantity for $t_{\text{TOF}}$ as the expected hitting time of a random walk. 
+For validation of this method, we performed numerical studies of two carriers' charge dynamics in an AlQ$_3$-lattice device. 
+The dependence of $t_{\text{TOF}}$ on the energy scaling parameter obtained by our methods agrees well with that of KMC. 
+
+Our method is shown to be efficient in calculating $t_{\text{TOF}}$ especially in low charge carrier density, by using the graph structure of the system and solving the matrix equations, 
+this method calculates the $t_{\text{TOF}}$ without going through the KMC simulation process which can have convergence difficulties.
+ 
+\end{abstract}
+
+% REQUIRED
+\begin{keywords}
+Charge dynamics, probability theory, multi-scale modeling, Markov chain
+\end{keywords}
+
+% REQUIRED
+\begin{MSCcodes}
+68Q25, 68R10, 68U05
+\end{MSCcodes}
+
+\section{Introduction}
+Understanding and manipulating the conductivity from both theoretical and experimental perspectives play a key role in recent advancements including but not limited to neuromorphic devices and circuit design.  
+Zooming into a microscopical scale of atoms and electrons, conductivity is related to the charge carrier's mobility which quantifies how fast or slow charge carriers move.
+One of the typical ways to quantify charge mobility is the time-of-flight experiment. The setting is shown in Fig. \ref{fig:TOF}. Charge carriers (electrons or holes) are inserted in the electrode (anode or cathode depending on the carrier type) which is called the source, and then after a charge transport process charges are absorbed and can be detected in another electrode which is called the sink. The time needed from the source to the sink $t_{\text{TOF}}$ is the time of flight.
+\begin{figure}
+    \centering
+    \includegraphics[width=1.0\textwidth]{fig/TOF_scheme/TOF.jpg}
+    \caption{A topological model of a charge conducting system consists of sites representing charge-localized segments. 
+    The left figure shows a macroscopic size device with a length of about 50 nm, consisting of conducting material (yellow color) and supporting media (brown color).
+    The source is the cathode, a thin rectangle on the top where charge carriers (electrons or holes) are injected and the dynamics begin. The Sink is the anode on the bottom where the charge carriers will be absorbed.
+    The red colored line shows a possible path of charge dynamics from Source to Sink. The trajectory can be obtained by performing kinetic Monte Carlo simulations.  
+    The right figure zooms in on part of the system with a length scale of 5 nm. The yellow solid circles represent the localized segments (sites) where the charges can occupy. The charge dynamics can be modeled as a jumping process between the sites shown by the red red line.
+    }
+    \label{fig:TOF}
+\end{figure}
+When an electric field $E_f$ is applied along a certain direction, the charge carriers will undergo a drift-diffusion process along this direction for a distance of $L$ during the time period $t_{\text{TOF}}$. The mobility is then defined as:
+\begin{equation}
+    \mu = \frac{L}{t_{\text{TOF}} E_f }
+    \label{equ:mu}
+\end{equation}
+Since $L$ and $E_f$ are known constants, calculating $\mu$ amounts to calculating $t_{\text{TOF}}$. The mobility without an electric field can be estimated experimentally by extrapolating the $\mu$ - $E_f$ curves. 
+
+At the microscopic level, this drift-diffusion process consists of a list of the jumping processes of charge carriers.  
+To understand how conductivity is related to the microscopic structure such as atoms and electrons, one needs to study the charge carriers' dynamics through quantum mechanics due to the quantum nature of the microscopic world. 
+When modeling the dynamical processes of charge carriers in complex physical systems, one needs to take into account parameters from multiple length scales \cite{ruhle_microscopic_2011, baumeier_stochastic_2012}, including the electronic structure at the atomic scale where charges' behavior obeys quantum mechanics principles, molecule morphology at the molecular scale, and device components connectivity at the macroscopic scale.
+
+A direct full evolution of the system dynamics, that is starting from the first principle of quantum mechanics to model how charges move in space, requires methods such as time-dependent density functional calculations\cite{runge_density-functional_1984} to obtain the charge density as a function of time. 
+Methods like time-dependent density functional make use of the fact that many-body wave function is equivalent to the time-dependent electronic density and derive the effective potential of a fictitious non-interacting system self-consistently.
+So performing those modeling methods easily goes beyond the limit of current computing powers \cite{baumeier_stochastic_2012}. 
+In complex systems with static disorder and soft interactions, the wave functions are localized in space. So the charge dynamics can be approximated by the tunneling process between the localized states\cite{mott_electrons_1967, hook_solid_1991}. In our terminology, The location of these localized states is called sites. Following this approximation, a transition rate between every pair of close sites $\omega_{ij}$ can be calculated from the first principle methods\cite{baumeier_stochastic_2012}. 
+
+Until this level, the dynamics of the complex system is a discrete space jumping process that can be modeled by a master equation (ME), a differential equation of the state propagation that will be detailed in the next session. 
+By solving the ME one can obtain properties such as $t_{\text{TOF}}$. There are different methods of solving ME, a typical one is the kinetic Monte Carlo (KMC) simulation which will be explained in the next section together with ME. 
+A major problem, however, is that for a large variety of material systems the energy disorder associated with the random medium is large and contains trapping regions where the charge carrier quickly becomes stuck, and therefore the estimation of mobility via KMC takes a very long computation time and the results show large fluctuation. 
+Those trapping regions are due to the existence of very large and small transition rates that are often seen in multi-scale modeling parameters.
+For example, the two commonly used rates include the Miller-Abraham rate and the Marcus rate. Here we briefly explain Marcus rate. Assuming that the transition between localized states is perturbative in the electronic degrees of freedom so that it can be treated by Fermi’s Golden Rule, the vibronic dynamics can be modeled by the displaced harmonic oscillator, and the vibronic energy scale is smaller than the energy difference of the
+states (corresponds to high-temperature limit), 
+then the transition rates between site $i$ and $j$ can be calculated via:
+\begin{equation}
+    \omega_{ij} = 2 \frac{\pi}{\hbar} \frac{J_{ij}^2}{\sqrt{4 \pi R_{ij} k_B T}} \exp \biggl[ -\frac {(\Delta E_{ij}-R_{ij})^2}{(4 R_{ij} k_B T)} \biggr] \mbox{,}
+    \label{equ:Marcus}
+\end{equation}
+Here $J_{ij}$ is the coupling element, $\Delta E_{ij} = E_i - E_j$ is the difference of site energies. $R$ is the reorganization energy. The exponential term and the constants make the rate very sensitive to small energy changes resulting in rates differing by a large magnitude. 
+A framework and software tools for understanding charge dynamics and rate calculation is detailed in this reference \cite{ruhle_microscopic_2011}. 
+
+The exponential term containing the $\Delta E_{ij}$ in Eqn. \ref{equ:Marcus} leads to extremely large and small rates for a Gaussian distributed $\Delta E_{ij}$, resulting in long computational time and poor convergence issues by methods like KMC. This is due to the fact that some low-energy regions are difficult to sample due to the small inflow rates. 
+To overcome those challenges, Ref. \cite{brereton_efficient_2014} proposes a computationally fast method called aggregated Monte Carlo (AMC) that uses a stochastic watershed algorithm to identify trapping regions and thus is able to analyze large system sizes over a long physical time. 
+This method improves the computational time at the cost of coarse-graining the energy landscape. The level of such coarse-graining and the error bounds depend on manually chosen thresholds. And this AMC method in Ref. \cite{brereton_efficient_2014} is only applied to the dynamics of one charge carrier, and has not been tested on multiple charge carrier dynamics. 
+Another problem with both KMC and AMC is that they produce a random variable. Those results cannot be used as signals for further analysis and uncertainty quantification which uses deterministic values as quantities of interest. 
+
+By noticing that KMC samples are random walk processes in a system of sites connected by transition rates, 
+a natural question would be how to make use of the probability nature of the random walk and graph properties of the connected system, to develop a way of calculating the mobility and related quantities without the issues of KMC and AMC. 
+For this purpose, we revisit the charge dynamics model in Section \ref{sec:graph} under the framework of probability and develop a matrix formula for calculating the charge mobility as absorbing time $t_A$.
+
+The paper is organized as follows.
+In section \ref{sec:Background} we recapitulate the master equation model of the charge dynamics and Kinetic Monte Carlo (KMC) simulation for obtaining the charge mobility. Section 3 proposed a graph-based model for calculating charge mobility. 
+Section 4.1 provides a numerical study of the multiple charge carriers' dynamics and provides different perspectives of ME-type dynamics. Since an increase in the carriers' number leads to an exponential increase of the state dimension, the numerical study model is chosen to be a 10 by 10 2D lattice with two charge carriers.
+Section 4.2 provides a numerical study of the one-carrier dynamics in a semiconductor system  AlQ$_3$, with the purpose of comparing the method of ME, KMC and the proposed graph-based method. 
+Section 5 is the discussion, and section 6 is the conclusion. 
+
+The list of notations used consistently is as listed. A few notations in the numerical study session overlap with the notations of other sessions, so the notations not listed below sessions are only valid within the single session. 
+Upper case alphabet with boldface represents matrix, lower case for vector. Matrix or vectors with subscripts represent their entries. \printnomenclature
+\nomenclature{\( N_s \)}{Number of sites }
+\nomenclature{\( N_c \)}{Number of charge carriers }
+\nomenclature{\( t \)}{time }
+\nomenclature{\( t_{\text{TOF}} \)}{time of flight}
+\nomenclature{\(i,j,k \)}{site index}
+\nomenclature{\(l,m,n \)}{time index}
+\nomenclature{\( \mathbf{s} \)}{state vector of site occupation, which has value 1 for being occupied and 0 unoccupied}
+\nomenclature{\( \mathbf{s}_i \)}{site occupation, has value 0 or 1}
+\nomenclature{\( \mathbf{s} (t_a)  \)}{site occupation state at time $t_a$}
+\nomenclature{\( p_i  \)}{occupation probability of site $i$}
+\nomenclature{\( \mathbf{P} \)}{Probability of an event}
+\nomenclature{\( \mathbf{I} \)}{identity matrix}
+\nomenclature{\( \mathbf{A} \)}{adjacency matrix}
+\nomenclature{\( \omega \)}{transition rate}
+
+\section{Background: Master Equation and Kinetic Monte Carlo}
+\label{sec:Background}
+
+The charge carriers' dynamics are described as a first-order differential equation of the system state probability $\mathbf{P}(\mathbf{s})$ known as the master equation, whose derivation is given in Ref. \cite{cottaar_calculating_2006, omura_master-equation-based_2021}. 
+We briefly recapitulate the conclusion from Ref. \cite{cottaar_calculating_2006}. On the condition that Coulomb interactions are neglected between different sites and Pauli repulsion leads to the single site occupancy, the state of the system is described in terms of the site occupation $\mathbf{s} = ( \mathbf{s}_1, \mathbf{s}_2, \cdots, \mathbf{s}_{N_s})$, known as states, where $N_s$ is the number of sites and $\mathbf{s}$ is the occupation which: 
+\begin{equation}
+   \mathbf{s}_i = \begin{cases}
+  1, & \text{if}\  \text{Occupied} \\
+  0, & \text{if}\  \text{Unoccupied}
+  \end{cases}
+  \label{equ:state_def}
+\end{equation}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.99\textwidth]{fig/2c_states/states.png}
+    \caption{The ten states of a connected 5-site system with blue circles representing unoccupied sites and red circles for occupied sites. The numbers on the top left plot are the site index. 
+    The state notations are the brackets containing 0 and 1 below each state plot. If site No.5 is the sink, then the sink states are $\mathbf{s}_4, \mathbf{s}_7, \mathbf{s}_9, \mathbf{s}_{10}$
+    }
+    \label{fig:5site}
+\end{figure}
+
+To visualize the states, a 5-site system is shown in Fig. \ref{fig:5site}. When there are two charge carriers, all ten possible states are listed, and four of them are sink states if site $i=5$ is the sink. 
+Based on \cite{cottaar_calculating_2006} the ordinary differential equation of the dynamics is written as:
+\begin{equation}
+    \frac{d \mathbf{P}_{ \mathbf{s} }}{d t} = \sum\limits_{i,j,i \neq j} \omega_{ij} \mathbf{s}_j (1-\mathbf{s}_i) \mathbf{P}_{\mathbf{s}( i \leftrightarrow j)} - \omega_{ji} \mathbf{s}_i (1-\mathbf{s}_j) \mathbf{P}_{\mathbf{s}} \mbox{,}
+    \label{equ:masterEqu1}
+\end{equation}
+where $\mathbf{s}( i \leftrightarrow j)$ denotes the state by interchanging the occupations of the site $i$ and $j$, $\omega_{ij}$ is the transition rate from $j$ to $i$.
+
+The mean field approximation assumes independence between every site occupation and gives a decomposition of the state probability $\mathbf{P}_{\mathbf{s}}$ as: 
+\begin{equation}
+    \mathbf{P}_{\mathbf{s}} = \mathbf{P}_{\mathbf{s}_1} \mathbf{P}_{\mathbf{s}_2} \cdots \mathbf{P}_{\mathbf{s}_{N_s}} \mbox{.}
+    \label{equ:decomp1}
+\end{equation}
+Substituting Eqn. \ref{equ:decomp1} into Eqn. \ref{equ:masterEqu1} and summing over all $\mathbf{s}_k$ except at the index $i$ gives the Pauli master equation:
+\begin{equation}
+    \frac{d p_i}{d t} = \sum\limits_{j} p_j (1- p_i) \omega_{ij} - p_i (1-p_j) \omega_{ji}
+    \label{equ:ms_MF} \mbox{,}
+\end{equation}
+where the fact that $\mathbf{P}(\mathbf{s}_i =1) = p_i$ and $\mathbf{P}(\mathbf{s}_i =0) = 1-p_i$ is utilized. Together with the normalization condition, $\sum\limits_{i}p_i=N_c$, where $N_c$ is the number of charge carriers, numerical methods similar to that suggested Yu \textit{et al.} \cite{yu_molecular_2001} can be used to solve Eqn. \ref{equ:ms_MF}, which uses the implicit iterations that immediately use the updated $p_i \; i \in [1, N_s]$ for the following calculation assuming finite carrier density. 
+From $p_i$ one can obtain properties such as occupation probabilities of stationary states, currents, and charge carrier mobility.
+In the situation of a single charge carrier, Eqn. \ref{equ:ms_MF} becomes coupled linear differential equations:
+%
+\begin{equation}
+    \frac{d p_i}{d t} = \sum\limits_{j} p_j  \omega_{ij} - p_i \omega_{ji}
+    \label{equ:ms1_1charge} \mbox{.}
+\end{equation}
+
+\begin{comment}
+According to Ref. \cite{brereton_efficient_2014}, using the stationary states occupation probability $p_i^s$, the drift velocity is the average velocity of the charge carriers:
+\begin{equation}
+    v = \sum\limits_{i} p_i^s (\sum\limits_{j} \omega_{ji} \mathbf{e}^T \mathbf{d}_{ij})
+\end{equation}
+where $\mathbf{d}_{ij}$ is the distance vector between site $i$ and $j$ considering the periodic boundary condition. With the applied electric field $E_f$, the mobility $\mu$ can be calculated by:
+\begin{equation}
+    \mu = \frac{v}{E_f} \mbox{,}
+    \label{equ:mu}
+\end{equation}
+\end{comment}
+
+Besides numerically solving the Pauli master equation Eqn. \ref{equ:ms_MF}, the $t_{\text{TOF}}$ can be estimated via kinetic Monte Carlo simulation \cite{jansen_introduction_2012, pasveer_unified_2005, bassler_charge_1993}. Here we briefly summarize the KMC algorithm. 
+
+Firstly only processes involving an occupied site $i$ are considered and the total escape rate is calculated as:
+\begin{equation}
+    \omega_i = \sum\limits_{j}\omega_{ji}
+\end{equation}
+where the sum is over all sites $j$ connected to site $i$. Then a particular charge carrier is selected by the first reaction method, that is to select the charge carrier $k$ with the smallest waiting time $t^w_k$ which is calculated using a random number $r_1 \in (0,1]$: 
+\begin{equation}
+     t^w_i = t + \omega_i^{-1} \ln r_1  \mbox{,}
+\end{equation}
+and the system time is advanced to new time $t_{\text{new}} = t^w_k$. 
+
+After this, a destination site $l$ for the transition is selected according to the variable step size method, that is to choose the biggest $j'$ such that 
+\begin{equation}
+    \omega_k^{-1} \sum\limits_{i=1}^{j'} \omega_{kj'} \leq r_2 \mbox{,}
+    \label{equ:VSSM}
+\end{equation} 
+where $r_2 \in (0,1]$ is the second random number. If this process is disabled due to Pauli repulsion, it will be removed from the list of Eqn. \ref{equ:VSSM} 
+and the charge carrier stays at $k$.
+If this process is enabled and the charge will be moved to the site $j'$. After this, a new waiting time for the charge carrier on site $j'$ is calculated as: $t^w_{j'} = t_{\text{new}} + \omega_{j'}^{-1} \ln r_3 $. Finally the charge $k$ with the smallest waiting time $t^w_k$ is selected again and the KMC cycle repeats. Whenever the sink is reached by one carrier, we have $t_{\text{TOF}}=t^w_{j'}$ and the mobility is calculated by Eqn. \ref{equ:mu}.
+
+\section{Graph-based random walk method}
+\label{sec:graph}
+While KMC has been the typical method of calculating charge mobility and $t_{\text{TOF}}$, the results from KMC have wide distribution and the KMC samples need to exceed a certain amount to have a stable sample average. Take $t_{\text{TOF}}$ for example, fig. \ref{fig:t_step} shows the distribution of KMC steps-$t_{\text{TOF}}$ relationship. 
+The $t_{\text{TOF}}$ can be of wide distribution depending on the number of steps to reach the sink, that is, the path from the source to the sink. 
+Figure \ref{fig:t_sample} shows the average $t_{\text{TOF}}$ as a function of KMC sample number. It shows that for the current system to obtain a converging $t_{\text{TOF}}$, more than 1000 samples are required. For $k=1.0$ the first 1000 samples give small $t_{\text{TOF}}$ since short-time paths are more easily sampled than time-consuming paths. In bigger systems with large energy standard deviations, the minimum samples increase exponentially to obtain a converging $t_{\text{TOF}}$ while a single KMC sample takes much longer computation time.  
+
+\begin{figure}
+    \centering
+    \includegraphics[width=1.0\textwidth]{fig/KMC_analysis/all_plots2.pdf}
+    \caption{Distributions of number of KMC steps until absorption in sink ($N_\text{TOF}$) and the corresponding absorption time ($t_\text{TOF}$) for a single realization of the model lattice with no site-energy disorder (a), Gaussian-distributed site-energies ($\mathcal{N}()$) without (b) and with spatial correlations (c). The density histogram consist of $10^7$ KMC sample points grouped into 100 bins.}
+    \label{fig:t_step}
+\end{figure}
+
+Testing 
+As an alternative to KMC, we use a graph-based method for calculating the $t_{\text{TOF}}$. To achieve this, we revisit the charge dynamics model in this section under the framework of probability and develop a matrix formula for calculating the $t_{\text{TOF}}$ as absorbing time. Without loss of generality, we consider a $N_s$-sites system contained in a rectangular simulation box of a certain length $L$ with $N_c$ charge carriers whose transitions are governed by the transition between the connected sites (charge localized segments). 
+Calculating $t_{\text{TOF}}$ is equivalent to calculating the absorption time $t_A$ for random walkers starting from the source and being absorbed in the sink. 
+KMC as described in Section \ref{sec:Background} can be used to calculate $t_A$ ~\cite{andersen_practical_2019, kolesnikov_kinetic_2018}. 
+
+Until this point, 
+we consider the sites as nodes on a directed graph  $\mathcal{G}(\mathcal{V}, \mathcal{E})$ whose nodes represent the sites and the directed edge weights for a connected pair of node $e(j,i)$ represent the rates from $j$ to $i$. 
+%If Marcus rate is used, then the directed edge weights are Marcus rate $\omega_{ji}$ \cite{baumeier_stochastic_2012}. 
+When $i,j$ is not connected in the physical system, the weight $e(i,j) = 0$. The adjacency matrix $\mathbf{A}$ of $\mathcal{G}$ is:
+\begin{equation}
+    \mathbf{A} = \begin{bmatrix}
+0 & \omega_{12} & \cdots & \omega_{1 N_s}\\
+\omega_{21} & 0 & \cdots & \omega_{2N_s}\\
+\vdots & \vdots & \ddots & \vdots & \\
+\omega_{N_s 1} & \omega_{N_s 2} & \cdots & 0\\
+\end{bmatrix}
+\end{equation}
+The charge dynamics now become random walks of charge carriers on a directed graph.
+In a $N_s$-node graph with $N_c$ charge carriers, there are in total ${N_s \choose N_c}$ states in the state space $\mathbf{s} = ( \mathbf{s}_1, \mathbf{s}_2, \cdots, \mathbf{s}_N)$ as defined in Eqn. \ref{equ:state_def}. In this graph setting, the charge dynamics can be modeled as the state probability evolution on the graph $\mathcal{G}$. 
+Before any charges reach the Sink, Pauli repulsion imposes that $\mathbf{s}_i \in \{0,1 \}$, and the number of charge carriers is $N_c$ gives: 
+\begin{equation}
+    \sum\limits_{i=1}^{N_s}\mathbf{s}_i = N_c
+\end{equation}
+Here is a definition of the state connection:
+\begin{definition}
+Two states $\mathbf{s}$ and $\mathbf{s}'$ are connected if and only if:
+\begin{enumerate}
+    \item There exists $N_c-1$ indexes such that for all $k$ that are in those indexes, $\mathbf{s}_k=\mathbf{s}'_k=1$. 
+    \item One can find an index $i$ satisfying $\mathbf{s}_i=1$ and $\mathbf{s}'_i=0$, and another index $j$ satisfying $\mathbf{s}_j=0$ and $\mathbf{s}'_j=1$. 
+    \item For the above indexes $i$ and $j$, $\omega_{ij}, \omega_{ji} \neq 0$
+\end{enumerate}
+If one of the above criteria is not satisfied, $\mathbf{s}$ and $\mathbf{s}'$ are unconnected.
+\label{def:1}
+\end{definition}
+
+Denote that at time $t_l$ the system is in state $\mathbf{s}(t_l)$, to find the system state at some later time $t_{l+1}$ one can use the conditional probability $\mathbf{P}(\mathbf{s}(t_{l+1}) | (\mathbf{s}(t_l);\mathbf{s}(t_{l-1}); \cdots))$. This probability considers the fact that the states $\mathbf{s}(t_l+1)$ may depend on the states before arriving in state $\mathbf{s}(t_l)$ at time $t_l$. From textbooks and literature \cite{schonherr_dispersive_1981} it is known that: 
+\begin{lemma}
+For a stochastic jumping process, the state $\mathbf{s}(t_l+1)$ depends only on the previous state $\mathbf{s}(t_l)$ which is connected to $\mathbf{s}(t_l+1)$ and the Markov Chain property is satisfied. That is:
+\begin{equation}
+    \mathbf{P}(\mathbf{s}(t_{l+1}) | (\mathbf{s}(t_l);\mathbf{s}(t_{l-1}),; \cdots)) = \mathbf{P}(\mathbf{s}(t_{l+1}) | (\mathbf{s}(t_l)) )
+\end{equation}
+\label{lemma:1}
+\end{lemma}
+There are other probability aspects of the jumping process. 
+For the charge carrier on site $i$, the leaving frequency out of the current node is 
+    \begin{equation}
+        \omega_{i} = \sum\limits_{j} \omega_{ji}
+    \end{equation}
+\begin{comment}
+A carrier jumps from site $i$ to site $j$ with a fixed frequency is a Poisson process.
+So let $X$ be a random variable with values in $\mathbb{N}$ representing the number of jumps $n_j = 0, 1, 2, \cdots$ from site $i$ to $j$, then we have the probability:
+\begin{equation}
+    \mathbf{P}(X=n_j) = e^{- \omega_i} \frac{\omega_i^{n_j} }{n_j !}
+\end{equation}
+\end{comment}
+
+Another fact that can be used is that, 
+in the continuous-time limit there exists a small time interval $\Delta t$ such that a carrier just making one jump to a connected node is $\omega_{i} \Delta t$ provided that $\Delta t$ is small enough so having two or more jumps from $i$ to $j$, or making jumps from site $i$ to $j$ then to $k$ is also negligible. 
+
+The situation of multiple charge carriers is more complex since the dynamics of all carriers are independent except when they are jumping to adjacent nodes that are occupied by another carrier such that Pauli expulsion restricts those processes.  
+If a single carrier's jumping satisfies the Markov property and all the carriers' dynamics are independent meaning that more than one carrier can jump at the same time (especially when they have the same leaving frequency $\omega_i$), then one may ask: is it possible that at a small $\Delta t$ the state $\mathbf{s}(t_l)$ can jump to an unconnected state $\mathbf{s}(t_{l+1})$? 
+The following theorem shows that the probability of jumping to unconnected states in multiple carriers' dynamics approaches zero. So the dynamics still preserve Markov property and the state $\mathbf{s}(t_{l+1})$ at $t_{l+1}$ only depends on the previous state $\mathbf{s}(t_l)$ which is connected to $\mathbf{s}(t_{l+1})$.
+
+\begin{theorem}
+    The evolution of the state probability from $\mathbf{s}(t_l)$ at $t_l$ to $\mathbf{s}(t_{l+1})$ at $t_{l+1}$ in the continuous-time limit depends only on the initial state $\mathbf{s}(t_l)$ connected to $\mathbf{s}(t_{l+1})$:
+    \begin{equation}
+        \mathbf{P}(\mathbf{s}(t_{l+1}) | (\mathbf{s}(t_l); \mathbf{s}(t_{l-1}); \cdots))
+        = \mathbf{P}(\mathbf{s}(t_{l+1})| \mathbf{s}(t_l))
+    \end{equation}
+    
+    and the transition probability $\mathbf{P}(\mathbf{s}(t_{l+1}) | \mathbf{s}(t_l))$ satisfies:
+\begin{equation}
+    \sum\limits_{ \mathbf{s}(t_l)} \mathbf{P}(\mathbf{s}(t_{l+1}) | \mathbf{s}(t_l)) = 1
+\end{equation}
+where the sum is over all $\mathbf{s}(t_l)$ connected to $\mathbf{s}(t_{l+1})$.
+\label{theorem1}
+\end{theorem}
+\begin{proof}
+Consider two carriers at site $i$ and $j$ with $\omega_{i}$, $\omega_{j}$. 
+
+Let $\Delta t$ be a small enough time step, such that the probability of making one jump in site $i$ is $\omega_i \Delta t$, and the probability of making one jump in site $j$ is $\omega_j \Delta t$.
+
+%Since their dynamics are independent, the probability of making jumps at site $i$ and $j$ in time interval $\Delta t$ is $\omega_i \omega_j \Delta t^2$.
+    
+Denote the probability of $n_c \in \{0,1,2 \}$ carriers making a jump at time $t$ is $\mathbf{P}_t(n_c)$. 
+Then:
+    \begin{equation}
+    \begin{split}
+        & \mathbf{P}_{t + \Delta t}(n_c) = \mathbf{P}_t(n_c) (1- \omega_{i} \Delta t - \omega_{j} \Delta t) + \\
+        & \mathbf{P}_t(n_c-1) ( \omega_{i} \Delta t + \omega_{j} \Delta t) + \mathbf{P}_t(n_c-2) \omega_i \omega_j \Delta t^2
+    \end{split}
+    \end{equation}
+Consider the derivative $\frac{d \mathbf{P}t(n_c)}{d t}$ in the limit of $\Delta t \rightarrow 0$:
+    \begin{equation}
+        \frac{d \mathbf{P}_t(n_c)}{d t} = -P_t(n_c)(\Delta t(\omega_i + \omega_j)) + P_t(n_c-1)(\Delta t(\omega_i + \omega_j)) 
+    \end{equation}
+    for $n_c=0$,
+    \begin{equation}
+        \frac{d \mathbf{P}_t(0)}{d t} = -\mathbf{P}_t(0)(\omega_i + \omega_j)\Delta t + \mathbf{P}_t(-1)(\omega_i + \omega_j)\Delta t
+    \end{equation}
+    Using $\mathbf{P}_0(-1) =0$ and $\mathbf{P}_0(0) =1$, so $\mathbf{P}_t(0) = e^{-(\omega_{i}+\omega_j) t} $.
+    Similarly, by induction we have:
+    \begin{equation}
+        \mathbf{P}_t(n_c)= \frac{[(\omega_{i}+\omega_j)t]^{n_c}}{n_c!} e^{(\omega_{i}+\omega_j)t} 
+    \end{equation}
+
+the probability of two carriers in time from $t$ to $t+\Delta t$ is 0 $\sim \mathcal{O} (\Delta t^2)$ while one carrier jumping probability is $\sim \mathcal{O} (\Delta t)$. Therefore, in the continuous time limit $\lim\limits_{t \rightarrow 0}\frac{\mathbf{P}_{t}(n_c=2)}{\mathbf{P}_{t}(n_c=1)}=0$, that is:
+
+    \begin{equation}
+    \begin{split}
+         \mathbf{P}(\mathbf{s}(t_{l+1}) | (\mathbf{s}(t_l); \mathbf{s}(t_l-1)))
+         & = 
+          \mathbf{P}(\mathbf{s}(t_l+1) | \mathbf{s}(t_l)) \times \frac{\mathbf{P}(\mathbf{s}(t_l))}{\mathbf{P}(\mathbf{s}(t_l); \mathbf{s}(t_{l-1}))} \\
+        & + \mathbf{P}(\mathbf{s}(t_{l+1}) | \mathbf{s}(t_{l-1})) \times \frac{\mathbf{P}(\mathbf{s}(t_{l-1}))}{\mathbf{P}(\mathbf{s}(t_l); \mathbf{s}(t_{l-1}))} \\
+         & = \mathbf{P}(\mathbf{s}(t_{l+1}) | \mathbf{s}(t_l))
+        \end{split}
+    \end{equation}
+
+Since $\mathbf{s}(t_{l+1})$ only depends on connected states $\mathbf{s}(t_l)$, so summing up all possible connected states:
+\begin{equation}
+    \sum\limits_{ \mathbf{s}(t_l)} \mathbf{P}(\mathbf{s}(t_{l+1}) | \mathbf{s}(t_l)) = 1
+\end{equation}
+\end{proof}
+
+Until here, the stochastic process of the states dynamics can be modeled as a continuous time Markov chain, the time of flight $t_{\text{TOF}}$ corresponds to first hitting time of the absorbing states which can be computed by solving a system of linear equations. A detailed reference can be found at \cite{norris_markov_1998}.
+Following this theory of continuous time Markov chain, we develop related concepts including transition matrix, holding time and absorption states of our investigated system, and verify that this Markov Chain model can derive the master equation which is the system's governing dynamics.
+
+The absorption states are the sink states which $\mathbf{s}_i = 0$ for $i$ in sink region and $\mathbf{s}_i \neq 0$ for other $i$.
+Now we need to relate the sink state to other states not connected to the sink. For this purpose we have:
+\begin{theorem}
+For any state $\mathbf{s}(t_m)$ before $\mathbf{s}(t_A)$ where A represents sink, 
+\begin{equation}
+     \mathbf{P}(\mathbf{s}(t_{A})| \mathbf{s}(t_m)) = 
+    \sum\limits_{\mathbf{s}(t_n)}  \mathbf{P}(\mathbf{s}(t_{A})|\mathbf{s}(t_n)) \mathbf{P}(\mathbf{s}(t_n)|\mathbf{s}(t_m)) 
+\label{equ:decom4}
+\end{equation}
+where the sum is over all states $\mathbf{s}(t_n)$ connected to $\mathbf{s}(t_m)$.
+\end{theorem}
+\begin{proof}
+The joint probability for being in state $\mathbf{s}(t_{l+m})$ at $t_{l+m}$ and state $\mathbf{s}(t_l)$ at $t_l$ is
+\begin{equation}
+    \mathbf{P}(\mathbf{s}(t_{l+m}) ; \mathbf{s}(t_l)) = \mathbf{P}(\mathbf{s}(t_{l+m})| \mathbf{s}(t_l))  \mathbf{P}(\mathbf{s}(t_l))
+    \label{equ:join_pro1}
+\end{equation}
+
+So by the induction principle, the joint probability for $m \geq 2$ states is: 
+\begin{equation}
+\begin{split}
+& \mathbf{P}(\mathbf{s}(t_{l+m}); \mathbf{s}(t_{l+m-1});\cdots ; \mathbf{s}(t_l)) = \mathbf{P}(\mathbf{s}(t_{l+m})| \mathbf{s}(t_{l+m-1})) \\
+& \mathbf{P}(\mathbf{s}(t_{l+m-1})| \mathbf{s}(t_{l+m-2})) \cdots \mathbf{P}(\mathbf{s}(t_l))
+\end{split}
+\label{equ:join_pro2}
+\end{equation}
+
+To relate one state to an unconnected state by some interconnected states, we use the joint probability: 
+\begin{equation}
+\begin{split}
+    & \mathbf{P}(\mathbf{s}(t_{l+m}); \mathbf{s}(t_l)) = \\
+    & \sum\limits_{\mathbf{s}(t_{l+m-1})} \cdots \sum\limits_{\mathbf{s}(t_{l+1})}  \mathbf{P}(\mathbf{s}(t_{l+m}); \mathbf{s}(t_{l+m-1}); \cdots; \mathbf{s}(t_{l+1}); \mathbf{s}(t_l))
+\end{split}
+\end{equation}
+where $\mathbf{s}(t_{l+m-1})$ is the interconnected state to $\mathbf{s}(t_{l+m})$ and $\mathbf{s}(t_{l+m-2})$, $\mathbf{s}(t_{l+m-2})$ is the interconnected state to $\mathbf{s}(t_{l+m-1})$ and $\mathbf{s}(t_{l+m-3})$, etc.
+
+Substituting Eqn. \ref{equ:join_pro1} and \ref{equ:join_pro2}:
+\begin{equation}
+\begin{split}
+    & \mathbf{P}(\mathbf{s}(t_{l+m});\mathbf{s}(t_{l})) = \sum\limits_{\mathbf{s}(t_{l+m-1})}  \cdots \sum\limits_{\mathbf{s}(t_{l+1})}  \mathbf{P}(\mathbf{s}(t_{l+m})|\mathbf{s}(t_{l+m-1})) \\
+    &  \mathbf{P}(\mathbf{s}(t_{l+m-1})|\mathbf{s}(t_{l+m-2})) \cdots \mathbf{P}(\mathbf{s}(t_l))
+\end{split}
+\label{equ:ck_gen1}
+\end{equation}
+
+Comparing Eqn. \ref{equ:join_pro1} and Eqn. \ref{equ:ck_gen1}  gives:
+\begin{equation}
+\begin{split}
+    & \mathbf{P}(\mathbf{s}(t_{l+m})|\mathbf{s}(t_l)) = 
+    \sum\limits_{\mathbf{s}(t_{l+m-1})}  \cdots \sum\limits_{\mathbf{s}(t_{l+1})}  \mathbf{P}(\mathbf{s}(t_{l+m})|\mathbf{s}(t_{l+m-1})) \\
+    &  \mathbf{P}(\mathbf{s}(t_{l+m-1})|\mathbf{s}(t_{l+m-2})) \cdots 
+\end{split}
+\label{equ:ck_gen3}
+\end{equation}
+\end{proof}
+
+Therefore, any two states separated by any period of time can be decomposed into interconnected states at an intermediate time using Eqn. \ref{equ:ck_gen3}.
+It can be shown that the state decomposition of Eqn. \ref{equ:ck_gen3} is equivalent to the master equation Eqn. \ref{equ:masterEqu1}. The derivation is in Appendix. 
+
+Now denote $\mathbf{s}(t_{0})$ as the state when carriers are inserted into the graph at time $t_0$ and the dynamics begin, $\mathbf{s}(t_{A})$ the sink state meaning that at time $t_A$, $\mathbf{s}_i = 1$ for site $i$ in the sink.
+So the time scale from $\mathbf{s}(t_m)$ to $\mathbf{s}(t_{A})$ is $t_A - t_m$, time scale from $\mathbf{s}(t_n)$ to $\mathbf{s}(t_A)$ is $t_A - t_n$. Denote the sojourn time of remaining at $\mathbf{s}(t_n)$ by $t^w(\mathbf{s}(t_n))$.
+
+Let $\omega'(\mathbf{s}(t_m))$ be the total frequency of jumping out of the state $\mathbf{s}(t_m)$, and $\omega'_{nm}$ the frequency of jumping from $\mathbf{s}(t_m)$ to $\mathbf{s}(t_n)$.
+Then $\mathbf{P}(\mathbf{s}(t_n)|\mathbf{s}(t_m)) = \frac{\omega'_{nm}}{\omega'(\mathbf{s}(t_m))}$.
+
+
+Recall that in the graph $\mathcal{G}$ with adjacency matrix $\mathbf{A}$, the charge carriers occupy $N_c$ nodes $\{ \text{node}(i_1), \text{node}(i_2), \cdots, \text{node}(i_{N_c}) \}$ at any state $\mathbf{s}(t_l)$. 
+Due to Pauli repulsion a carrier at site $i$ 
+
+By removing all the edges $e(i,j)$ if nodes $\text{node}(i),\text{node}(j)$ are occupied, the sum of all the directed edges' weights pointing outside of all the occupied nodes is $\omega'(\mathbf{s}(t_m))$. 
+After such edges removing, it can be verified that the sum of the weights pointing out of node $j \in \{ \text{node}(i_1), \text{node}(i_2), \cdots, \text{node}(i_{N_c}) \}$ is $\omega'_{\text{node}(j)}$ shorted as $\omega'_j$:
+\begin{equation}
+    \omega'_j = \sum\limits_{k_1 = 1}^N \mathbf{A}_{k_1 j} \prod\limits_{k_2 = i_1}^{i_{N_c}} (1- \delta_{k_1 k_2})
+\end{equation}
+So 
+\begin{equation}
+    \omega'(\mathbf{s}(t_m)) = \sum\limits_{k=1}^{N_s} \omega'_k \mathbf{s}_k(t_m)
+\end{equation}
+
+Noticing $\mathbf{s}(t_m)$ and $\mathbf{s}(t_n)$ are connected and by Def. \ref{def:1}, there must be two nodes indexes $k_1, k_2 \in [1,N]$ whose occupancy is different in $\mathbf{s}(t_m)$ and $\mathbf{s}(t_n)$, so $\omega'_{nm} = \omega_{k_1 k_2}$. Therefore Eqn. \ref{equ:decom4} can be written in time variable which is our quantity of interest:
+\begin{equation}
+    t_A - t_m = \sum\limits_{n} (t_A - t_n) \frac{\omega'_{nm}}{\omega'(\mathbf{s}(t_n))} + \mathbb{E} (t^w(\mathbf{s}(t_n)))
+\end{equation}
+Write $t_A - t_m$ for all $m$ as a vector $\Vec{t}$ in $  \mathbb{R}^{{N_s \choose N_c}}$, and $\mathbb{E} (t^w(\mathbf{s}(t_m)))$ as a vector $\Vec{b}$, then we have the matrix equation:
+\begin{equation}
+    (\mathbf{I} - \mathbf{W})\Vec{t} = \Vec{b}
+    \label{equ:matrix1}
+\end{equation}
+here $\mathbf{W}: W_{nm} = \frac{\omega'_{nm}}{\omega'(\mathbf{s}(t_n))}$ is a stochastic matrix in the sense that its row is summed up to 1. Now we need to calculate the vector $\Vec{b}$.
+\begin{theorem}
+    \begin{equation}
+        \Vec{b}_n = \frac{1}{\omega'(\mathbf{s}(t_n))}
+        \label{equ:time2}
+    \end{equation}
+\end{theorem}
+\begin{proof}
+    Denote $\mathbf{P}_t(X=n_j)$ as the probability of making $n_j$ state changes in time $t$. 
+    By Theorem \ref{theorem1}, the state $\mathbf{s}(t_n)$ only depends on previously connected states.
+    In a short time interval $\Delta t$:
+    \begin{equation}
+        \mathbf{P}_{t + \Delta t}(X=n_j) = \mathbf{P}_t(X=n_j) ( 1-\omega'(\mathbf{s}(t_n)) \Delta t ) + \mathbf{P}_t(X=n_j-1) \omega'(\mathbf{s}(t_n)) \Delta t
+    \end{equation}
+    So $\mathbf{P}_t(X=0) = e^{-\omega'(\mathbf{s}(t_n)) t}$, so:
+    \begin{equation}
+        \Vec{b}_n = \mathbb{E}( t^w (\mathbf{s}(t_n)) ) = \int_0^{\infty} t e^{-\omega'(\mathbf{s}(t_n)) t} dt = \frac{1}{\omega'(\mathbf{s}(t_n))}
+    \end{equation}
+\end{proof}
+Substitution of this result to the Eqn. \ref{equ:matrix1}, the absorption time of all the states can be obtained by solving a matrix equation. The time of flight is thus calculated as the expected absorption time from Eqn. \ref{equ:matrix1} and become a deterministic value as compared to a random variable in KMC.
+This expected absorption time depends on the expected sojourn time of states determined by Eqn. \ref{equ:time2}. And the matrix $\mathbf{I}-\mathbf{W}$ plays the role of mapping the local sojourn time $\Vec{b}$ to the expected absorption time. Here local means that $\Vec{b}$ is only determined by the physical properties of the localized segment.  
+
+
+\begin{comment}
+\section{Stability and Solvability of the Linear System}
+\begin{theorem}
+    If $\mathcal{G}$ is a connected graph, there is a unique solution $\Vec{t}$ satisfying the source and sink boundary condition. 
+\end{theorem}
+\end{comment}
+
+\section{Numerical study}
+Numerical studies are performed to verify our proposed method of calculating $t_{\text{TOF}}$, and to compare with methods such as KMC and master equation. 
+As mentioned before, a major problem of using KMC to calculate $t_{\text{TOF}}$ or mobility is that for many complex physical systems the energy landscape contains regions where the charge carrier quickly becomes stuck or regions difficult to sample.
+And some alternatives such as AMC has limitations as mentioned in the introduction.
+
+While the Master equation gives a deterministic time trajectory of the system, the time of flight depends on a threshold of $p_{\text{sink}}$ above which one can consider the sink state is reached.
+In theory, when there is one charge carrier the $p_{\text{sink}}$ approaches 1 but will never be equal to one. So the time of flight is not well defined in the master equation.
+Another difficulty in calculating $t_{\text{TOF}}$ by the Master equation is the issue with stiffness. 
+Systems containing both very large rates and very small rates are very common such as those modeled by the Marcus rate, so the master equation is a system of stiff equations. Calculating the $t_{\text{TOF}}$ by integrating the Master equation requires a time step in the magnitude of the smallest rates, resulting in a long computation time. 
+
+To demonstrate how the graph random walk method can address those challenges, we perform numerical studies on an AlQ$_3$ device sampled into an 8 by 8 by 8 lattice structure. and compare the results from KMC and the graph random walk method. The situations of both one and two carriers are studied to make a comparison with the KMC method. 
+
+\subsection{AlQ$_3$-lattice system}
+\begin{figure}[tb]
+    \centering
+    \includegraphics[width=\textwidth]{fig/KMCRW_compare/t_RW_KMC.pdf}
+    \caption{The dependence of $t_{\text{TOF}}$ on the energy scaling parameter $k$, in the case of one charge carrier and two charge carriers. The $t_{\text{TOF}}$ are calculated by both RW and KMC methods. Each data point represents the average $t_{\text{TOF}}$ calculated from the ten realizations of the Gaussian distributed energy landscapes.
+    Each KMC simulation contains 1000 runs. 
+    }
+    \label{fig:t_RW_KMC}
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.49\linewidth]{fig/MEq/MEq_0.0.pdf}\hfill \includegraphics[width=0.49\linewidth]{fig/MEq/MEq_1.0.pdf}
+    \caption{Time-dependent probability of sink occupation, $p_\text{sink}(t) = \sum_{i \in \text{sink}}p_i(t)$, from solutions of Eq.~\ref{equ:ms1_1charge}, for (a) no energetic disorder and (b) uncorrelated energetic disorder cases. Red vertical lines are the $t_{\text{TOF}}$ from Eq.~\ref{equ:matrix1}.} 
+\end{figure}
+
+
+
+
+
+The AlQ$_3$-lattice is an 8 by 8 by 8 lattice structure with 512 sites. The site energies are sampled from the Gaussian distributed energy landscape of the first principle simulated AlQ$_3$ device, which is $\mathcal{N}(-0.758, 0.189)$ the energy unit in eV. The reorganization energy is $0.23$ eV. The squared coupling element decays exponentially with distance, and at 1 nm it has the average value of the simulated AlQ$_3$ device, which is $1.80 \times 10^{-4}$. 
+Since one system means one realization of the Gaussian energy distribution, we make ten systems each of which is of the same Gaussian energy distribution for the numerical studies, and the $\mu$ is calculated as the sampled average.  
+The lattice constant, that is the distance between the two nearest sites is 1 nm. The coordinates of the studied system start at $(0,0,0)$ and end at $(7,7,7)$.
+The source region contains the sites whose $X$ coordinates are less than 1, and the sink region contains those sites with $X>6$. 
+The system is in periodic boundary conditions along the Y-axis and Z-axis. 
+
+\begin{figure}[tb]
+    \centering
+    \includegraphics[width=\textwidth]{fig/PF_plots/PF_plot.pdf}
+    \caption{The effect of the electric field on $\mu$ for systems with different energy scaling parameter $k$.}
+    \label{fig:time_F2}
+\end{figure}
+
+To validate the graph-based random walk (GRW) method by comparing it with the Bruce force KMC, we use KMC and graph-based random walk methods to calculate the $t_{\text{TOF}}$. 
+
+Figure \ref{fig:t_RW_KMC} shows the $t_{\text{TOF}}$ as a function of $k$, the energy scaling parameter.
+The overlap of the KMC data points and GRW data points demonstrates that the $t_{\text{TOF}}$ obtained from the GRW method and KMC method are very close.
+This plot indicates a decrease of $t_{\text{TOF}}$ as the number of carriers increases for all values of $k$.
+Noticeably, the plot shows that the effect of as $k$ increases from 0 to 1 the $t_{\text{TOF}}$ increases. The reason is that the probability of having large-size trapping regions increases when $k$ increases. 
+It is also shown that when $k$ increases from 0 to 1, the $t_{\text{TOF}}$ of the one carrier system increases more than that of the two carriers system. 
+A possible explanation is that, as $k$ increases, the trapping regions slow down the charge dynamics by trapping the carrier if there is only one carrier. When there are two carriers, trapping regions are filled in by one carrier while the other carrier transports to the sink without getting trapped.  
+
+The effect of $k$ on the $\mu$ is studied using the GRW method for the two charge carriers' systems under the condition of different strengths of the applied electric along the X-axis. The results are shown in Fig. \ref{fig:time_k_efield}. The result shows that for $k=1$ as the electric field increase, the mobility increase because the electric field adds a drift force to pull the charge to the sink. 
+
+When there are multiple sites in the source region but only two carriers are inserted, the number of the source state $n_{\text{Sr}} > 1$. To calculate the $t_{\text{TOF}}$ when there are multiple source states, an averaged $t_{\text{TOF}}$ is calculated over all source states. For this purpose, we define serial average and parallel average. 
+Analogous to the electric circuit network where the total resistance can be related to the resistance of its component by serial law of parallel depending on the network structure. 
+
+To calculate the $t_{\text{TOF}}$ for the charge dynamics, the serial average is
+\begin{equation}
+    t_{\text{TOF}} = \frac{1}{n_{\text{Sr}}} \sum\limits_{i=1}^{n_{\text{Sr}}} (t_{\text{TOF}})_i
+\end{equation}
+while the parallel average is:
+\begin{equation}
+    \frac{1}{t_{\text{TOF}}} = \frac{ n_{\text{Sr}} }{ \sum\limits_{i=1}^{n_{\text{Sr}}} \frac{1}{(t_{\text{TOF}})_i} } 
+\end{equation}
+
+While the two versions of the average are close, an obvious difference can be seen when $k=1$. 
+For the following $t_{\text{TOF}} $ and $\mu $ calculation we used parallel average, because the source and sink condition corresponds to an applied voltage between the source and sink, and all charge transport paths from source to sink resemble the parallel network resistor' structure, that is, sharing a common voltage.  
+
+The Poole-Frankel behavior is also investigated by the GRW method for the two charge carriers'  AlQ$_3$-lattice device, and the results are shown in Fig. \ref{fig:time_F2}. 
+
+\section{Discussion - Comparison of ME, KMC, and Random walk probability methods}
+We compare the three methods of calculating $t_{\text{TOF}}$ to indicate how the probability method complements the Master equation model and KMC. 
+Master equation models the dynamics by the system of differential equations Eqn. \ref{equ:ms_MF} or Eqn. \ref{equ:ms1_1charge}, so the whole dynamics as a function of time can be extracted. 
+In the case of one charge carrier, the master equation can be solved analytically to provide the charge occupation of all sites. 
+The time of flight is obtained at the time when the charge occupation in the sink is close to 1. That is, in the $P(\text{sink})$ vs. $t$ plot such as Fig. \ref{fig:AlQ3_ME} (left), the time $t$ when $P(\text{sink})$ becomes close to 1.
+
+However, the $t_{\text{TOF}}$ depends exponentially on how one defines $P(\text{sink})$. For large $P(\text{sink})$ it takes a very long computational time to reach the criteria.  
+Computational time using the explicit method is also a problem for energetic disorder systems due to the stability of the numerical integration. 
+Thus the application master equation relies on the choice of a specific solver. The numerical integration scheme does not make use of the fact that the transition matrix is sparse, which is usually the case for charge dynamics in complex physical systems.
+In the case of multiple charge carriers, the dynamics become nonlinear and one needs to resort to the mean-field approximation, which means that numerical solver such as backward Euler method does not work. 
+
+In conclusion, the master equation has the listed disadvantages in practice:  
+\begin{itemize}
+    \item In the $P(\text{sink})$ vs. $t$ plot, to decide that the $P(\text{sink})$ is close to 1 a threshold $P_c$ need to be defined. This definition of $P_c$ greatly influence the $t_{\text{TOF}}$. As shown in AlQ3 example, when $P_c = 1-10^{-2}$, $t_{\text{TOF}}= 1.27\times 10^{-4}$. When $P_c = 1-10^{-6}$, $t_{\text{TOF}}= 4.68\times 10^{-4}$.
+    \item Scaling becomes a challenge. When the system becomes large, energy disorder leads to extremely large and small transition rates. As a result, the numerical integration time steps $dt$ for obtaining $t_{\text{TOF}}$ needs to be very small. A small $dt$ leads to a very long computational time.
+    \item As small $dt$ needs a long computational time using the forward Euler or RK4 method, the choice of the integrator is limited to an implicit method such as the backward Euler method, which cannot be implemented for nonlinear systems.
+    \item Scaling also leads to a computation memory problem. For a full description of system dynamics, the state vector at every time step during numerical integration has to be stored. When the system size is large and many numerical steps are required, a large memory is needed for storing the full state vector. 
+    \item To model the dynamics of multiple charge carriers, one has to resolve to mean-field approximation which no analytical solution has been provided due to the nonlinear behavior. 
+\end{itemize}
+
+In the case of multiple charge carriers, KMC simulation can model both one charge carrier and multiple charge carriers, although it is ambiguous on the definition of how many carriers need to be absorbed to have $t_{\text{TOF}}$. 
+Another advantage of KMC is that the sparsity of the transition matrix is inherent in the algorithm. 
+So compared with the Master equation, the advantages of KMC are:
+\begin{itemize}
+    \item The implementation of KMC makes use of the sparsity nature of the transition matrix. 
+    \item KMC can apply to both single random walker and multiple random walkers scenarios. If the $t_{\text{TOF}}$ is defined to be the time when the one random walker is absorbed, the computational time decreases as the number of random walker increase. 
+\end{itemize}
+
+
+The drawback of KMC is also obvious. 
+The $t_{\text{TOF}}$ obtained via KMC are random variables whose distribution depends on the dynamics' nature. 
+When performing KMC simulation in AlQ$_3$ system, the energy difference $\Delta E_{ij}$ in the exponential term usually leads to regions of deep traps such that it takes a very long computational time for a random walker to jump out of the region. The same mechanism leads to the unsatisfying convergence of KMC simulation \cite{brereton_efficient_2014}. 
+
+The probability method proposed here are the expected value of the hitting time, thus it is deterministic and can be used as a single signal for further investigation such as the PF behavior, and quantity of interest in uncertainty analysis. 
+Calculating the $t_{\text{TOF}}$ as the expected hitting time from Eqn. \ref{equ:matrix1} can overcome the traps and convergence problem in the KMC simulation. 
+Solving the system of these linear equations can be implemented to make use of the sparsity of the dynamic nature. 
+
+The drawbacks of this probability method are that it does not consider the full dynamical picture of the system. For the case of multiple charge carriers even though the $t_{\text{TOF}}$ can be calculated deterministically in theory, the size of the linear equation system increases exponentially due to the finite number of states being $n_{\text{state}} = \frac{n!}{k!(n-k)!}$. For such large sizes matrices, numerical precision and the implementation of numerical schemes to solve the matrix problem becomes nontrivial.
+
+\section{Conclusions}
+\label{sec:conclusions}
+In conclusion, we propose a method of calculating charge mobility based on graph dynamics. 
+This method provides an effective calculation of the time of flight in the case of deep energy traps which cause KMC simulation and numerical solving master equation hard to converge.  
+The graph-based dynamics method proposed here can be a very useful alternative to obtain drift-diffusion mobility in a complex physical system. 
+
+In the Source and Sink model, the time $t_A$ obtained by this method becomes a deterministic quantity in contrast to that obtained from KMC which gives random variables. This deterministic result can be used as a quantify for uncertainty quantification of complex system dynamics, which contains approximation in different scales of quantum level and classical mechanics level. 
+
+\section*{Acknowledgments}
+This research was supported by TU/Eindhoven, the Institute for Complex Molecular Systems and the Department of Mathematics and Computer Science. 
+
+
+\bibliographystyle{siamplain}
+\bibliography{references}
+\end{document}
